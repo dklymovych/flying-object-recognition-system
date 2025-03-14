@@ -77,6 +77,7 @@ void MainWindow::resizeImage(cv::Mat &img) {
 
 void MainWindow::createMenuBar() {
     createAnalysisSection();
+    createFilteringSection();
 }
 
 void MainWindow::createAnalysisSection() {
@@ -130,10 +131,80 @@ void MainWindow::buildBrightnessHistogram() {
 }
 
 void MainWindow::improveContrast() {
+    if (pixmap_.isNull()) {
+        return;
+    }
+
     cv::Mat img = convertQPixmapToMat(pixmap_);
     convertScaleAbs(img, img, 1.5, 0);
     resizeImage(img);
 
     cv::imshow("Improved contrast", img);
+    cv::waitKey(1);
+}
+
+void MainWindow::createFilteringSection() {
+    auto filteringMenu = menuBar()->addMenu("Filtering");
+    auto removeNoiseAction = filteringMenu->addAction("Remove noise");
+    auto increaseSharpnessAction = filteringMenu->addAction("Increase sharpness");
+
+    connect(removeNoiseAction, &QAction::triggered, this, &MainWindow::removeNoise);
+    connect(increaseSharpnessAction, &QAction::triggered, this, &MainWindow::increaseSharpness);
+}
+
+void MainWindow::removeNoise() {
+    if (pixmap_.isNull()) {
+        return;
+    }
+
+    cv::Mat img = convertQPixmapToMat(pixmap_);
+    cv::Mat gaussianBlurred, medianBlurred, bilateralFiltered;
+
+    cv::GaussianBlur(img, gaussianBlurred, cv::Size(5, 5), 1.5);
+    cv::medianBlur(img, medianBlurred, 5);
+    cv::cvtColor(img, img, cv::COLOR_BGRA2GRAY);
+    cv::bilateralFilter(img, bilateralFiltered, 9, 75, 75);
+
+    resizeImage(gaussianBlurred);
+    resizeImage(medianBlurred);
+    resizeImage(bilateralFiltered);
+
+    cv::imshow("Gaussian filter", gaussianBlurred);
+    cv::imshow("Median filter", medianBlurred);
+    cv::imshow("Bilateral filter", bilateralFiltered);
+    cv::waitKey(1);
+}
+
+void MainWindow::increaseSharpness() {
+    if (pixmap_.isNull()) {
+        return;
+    }
+
+    cv::Mat img = convertQPixmapToMat(pixmap_);
+    cv::Mat sharpened1, sharpened2, sharpened3;
+
+    cv::Mat kernel = (cv::Mat_<float>(3, 3) <<
+        -1,  -1,  -1,
+        -1,   9,  -1,
+        -1,  -1,  -1);
+
+    cv::filter2D(img, sharpened1, -1, kernel);
+
+    cv::Mat blurred;
+    cv::GaussianBlur(img, blurred, cv::Size(5, 5), 1.5);
+    cv::addWeighted(img, 1.5, blurred, -0.5, 0, sharpened2);
+
+    cv::Mat laplacian, laplacianAbs;
+    Laplacian(img, laplacian, CV_16S, 3);
+    convertScaleAbs(laplacian, laplacianAbs);
+    addWeighted(img, 1, laplacianAbs, 1, 0, sharpened3);
+
+    resizeImage(sharpened1);
+    resizeImage(sharpened2);
+    resizeImage(sharpened3);
+
+    cv::imshow("Sharpening Kernel", sharpened1);
+    cv::imshow("Unsharp Masking", sharpened2);
+    cv::imshow("Laplacian", sharpened3);
     cv::waitKey(1);
 }
