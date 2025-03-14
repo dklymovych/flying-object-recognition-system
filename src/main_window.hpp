@@ -18,6 +18,7 @@ private:
 
     void createMenuBar();
     void createAnalysisSection();
+    void createFilteringSection();
 
     cv::Mat convertQPixmapToMat(const QPixmap &pixmap);
     QPixmap convertMatToQPixmap(const cv::Mat &mat);
@@ -29,4 +30,7 @@ private slots:
 
     void buildBrightnessHistogram();
     void improveContrast();
+
+    void removeNoise();
+    void increaseSharpness();
 };
