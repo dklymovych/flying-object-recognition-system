@@ -78,6 +78,7 @@ void MainWindow::resizeImage(cv::Mat &img) {
 void MainWindow::createMenuBar() {
     createAnalysisSection();
     createFilteringSection();
+    createSegmentationSection();
 }
 
 void MainWindow::createAnalysisSection() {
@@ -195,9 +196,9 @@ void MainWindow::increaseSharpness() {
     cv::addWeighted(img, 1.5, blurred, -0.5, 0, sharpened2);
 
     cv::Mat laplacian, laplacianAbs;
-    Laplacian(img, laplacian, CV_16S, 3);
-    convertScaleAbs(laplacian, laplacianAbs);
-    addWeighted(img, 1, laplacianAbs, 1, 0, sharpened3);
+    cv::Laplacian(img, laplacian, CV_16S, 3);
+    cv::convertScaleAbs(laplacian, laplacianAbs);
+    cv::addWeighted(img, 1, laplacianAbs, 1, 0, sharpened3);
 
     resizeImage(sharpened1);
     resizeImage(sharpened2);
@@ -206,5 +207,61 @@ void MainWindow::increaseSharpness() {
     cv::imshow("Sharpening Kernel", sharpened1);
     cv::imshow("Unsharp Masking", sharpened2);
     cv::imshow("Laplacian", sharpened3);
+    cv::waitKey(1);
+}
+
+void MainWindow::createSegmentationSection() {
+    auto segmentationMenu = menuBar()->addMenu("Segmentation");
+    auto thresholdSegmentationAction = segmentationMenu->addAction("Threshold segmentation");
+    auto separateForegroundAndBackgroundAction = segmentationMenu->addAction("Separate foreground and background");
+
+    connect(thresholdSegmentationAction, &QAction::triggered, this, &MainWindow::thresholdSegmentation);
+    connect(separateForegroundAndBackgroundAction, &QAction::triggered, this, &MainWindow::separateForegroundAndBackground);
+}
+
+void MainWindow::thresholdSegmentation() {
+    if (pixmap_.isNull()) {
+        return;
+    }
+
+    cv::Mat img = convertQPixmapToMat(pixmap_);
+    cv::cvtColor(img, img, cv::COLOR_BGRA2GRAY);
+
+    cv::Mat binary, otsu;
+    int threshold_value = 127;
+
+    cv::threshold(img, binary, threshold_value, 255, cv::THRESH_BINARY);
+    cv::threshold(img, otsu, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    resizeImage(binary);
+    resizeImage(otsu);
+
+    cv::imshow("Threshold segmentation", binary);
+    cv::imshow("Otsu method", otsu);
+
+    cv::waitKey(1);
+}
+
+void MainWindow::separateForegroundAndBackground() {
+    if (pixmap_.isNull()) {
+        return;
+    }
+
+    cv::Mat img = convertQPixmapToMat(pixmap_);
+    cv::cvtColor(img, img, cv::COLOR_RGB2BGR);
+    resizeImage(img);
+
+    cv::Mat mask = cv::Mat::zeros(img.size(), CV_8UC1);
+    cv::Rect rectangle(50, 50, img.cols - 100, img.rows - 100);
+
+    cv::Mat bgModel, fgModel;
+    cv::grabCut(img, mask, rectangle, bgModel, fgModel, 5, cv::GC_INIT_WITH_RECT);
+
+    mask = (mask == cv::GC_FGD) | (mask == cv::GC_PR_FGD);
+
+    cv::Mat result;
+    img.copyTo(result, mask);
+
+    cv::imshow("GrabCut", result);
     cv::waitKey(1);
 }
